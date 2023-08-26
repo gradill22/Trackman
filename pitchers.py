@@ -50,15 +50,16 @@ def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None
         plt.scatter(pitch_data['HorzBreak'], pitch_data['InducedVertBreak'], c=colors[pitch], marker=markers[pitch],
                     label=pitch)
 
-    if chart_made:
-        plt.axvline(x=0, color='black', linestyle=':')
-        plt.axhline(y=0, color='black', linestyle=':')
-        plt.xlabel('Horizontal Break (in)')
-        plt.ylabel('Vertical Break (in)')
-        plt.title(f'Vertical and Horizontal Break by Pitch Type - {name}')
-        plt.legend()
-        plt.savefig(fname=f"{file_name}_pitch_breaks.png")
-        plt.close()
+    if not chart_made:
+        return
+
+    plt.axvline(x=0, color='black', linestyle=':')
+    plt.axhline(y=0, color='black', linestyle=':')
+    plt.xlabel('Horizontal Break (in)')
+    plt.ylabel('Vertical Break (in)')
+    plt.title(f'Vertical and Horizontal Break by Pitch Type - {name}')
+    plt.legend()
+    plt.savefig(fname=f"{file_name}_pitch_breaks.png")
 
 
 def pitch_calls_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
@@ -74,40 +75,92 @@ def pitch_calls_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
         plt.scatter(pitch_data['PlateLocSide'], pitch_data['PlateLocHeight'], c=result_color[call], marker='o',
                     label=call)
 
-    if chart_made:
-        for x in xTikMarks:
-            plt.plot([x, x], [yTikMarks[0], yTikMarks[-1]], color=strike_zone_color)
-        for y in yTikMarks:
-            plt.plot([xTikMarks[0], xTikMarks[-1]], [y, y], color=strike_zone_color)
+    if not chart_made:
+        return
 
-        plt.xlabel('Horizontal Location (ft)')
-        plt.ylabel('Vertical Location (ft)')
-        plt.title(f'Pitch Location - {name}')
-        plt.legend()
-        plt.savefig(fname=f"{file_name}_strike_zone.png")
-        plt.close()
+    for x in xTikMarks:
+        plt.plot([x, x], [yTikMarks[0], yTikMarks[-1]], color=strike_zone_color)
+    for y in yTikMarks:
+        plt.plot([xTikMarks[0], xTikMarks[-1]], [y, y], color=strike_zone_color)
+
+    plt.xlabel('Horizontal Location (ft)')
+    plt.ylabel('Vertical Location (ft)')
+    plt.title(f'Pitch Location - {name}')
+    plt.legend()
+    plt.savefig(fname=f"{file_name}_strike_zone.png")
 
 
-def box_charts(name: str, data: pd.DataFrame, file_name: str) -> None:
+def pitch_summaries(name: str, data: pd.DataFrame, file_name: str) -> None:
     pitches = data.groupby(['TaggedPitchType'])
     if len(pitches) == 0:
         pitches = data.groupby(['AutoPitchType'])
 
-    for d in data_points:
-        fig, ax = plt.subplots()
-        total_data, col_labels = [], []
-        for pitch, group in pitches:
-            pitch = pitch[0]
-            if pitch != 'Undefined':
-                total_data.append(group[d].values)
-                col_labels.append(pitch)
-        if len(total_data) > 0:
-            ax.boxplot(total_data)
-            ax.set_xticklabels(col_labels)
-            ax.set_ylabel(f'{translation[d]} ({units[d]})')
-            ax.set_title(f'{translation[d]} by Pitch - {name}')
-            plt.savefig(fname=f"{file_name}_{translation[d].replace(' ', '_')}.png")
-        plt.close()
+    n_datasets_per_plot = int(pitches.ngroups)
+    data_sets = []
+    pitch_names = []
+
+    for pitch, group in pitches:
+        if 'Undefined' in pitch:
+            continue
+        data_sets.append([])
+        pitch_names.append(pitch[0])
+        for dp in data_points:
+            d = group[dp]
+            d.dropna(axis=0, inplace=True)
+            data_sets[-1].append(d)
+
+    if len(data_sets) == 0:
+        return
+
+    # Create subplots vertically
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(9 + int(pitches.ngroups), 8))
+    axes = axes.flatten()
+
+    # Width of each violin plot
+    width = 0.2
+
+    # Keep track of unique legend artists
+    legend_artists_dict = {}
+
+    # Plot multiple violin plots in each subplot
+    try:
+        for i, ax in enumerate(axes):
+            for j in range(n_datasets_per_plot):
+                dataset = data_sets[j][i]
+                color = colors[pitch_names[j]]
+
+                # Calculate the position for the current violin
+                pos = i + j * width - (n_datasets_per_plot - 1) * width / 2
+
+                # Plot violin plot
+                parts = ax.violinplot(dataset, positions=[pos], widths=width, showmeans=True)
+
+                # Set properties for all lines
+                for pc in parts['bodies']:
+                    pc.set_facecolor(color)
+                    pc.set_edgecolor('black')
+                    pc.set_alpha(0.6)
+                for part_name in ('cbars', 'cmaxes', 'cmins', 'cmeans'):
+                    vp = parts[part_name]
+                    vp.set_edgecolor('black')
+
+                # Create an artist for the legend
+                legend_key = (color, pitch_names[j])
+                if legend_key not in legend_artists_dict:
+                    legend_artists_dict[legend_key] = plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=color,
+                                                                 markersize=10, label=pitch_names[j])
+
+            ax.set_title(translation[data_points[i]])
+            ax.set_xticklabels([])  # Hide the x-ticks bar
+            ax.set_ylabel(units[data_points[i]])
+    except IndexError:
+        print(f'Error for {name} {data["Date"].values[0]}')
+        return
+
+    fig.suptitle(f'Pitch Arsenal Summary - {name}')
+    fig.legend(handles=list(legend_artists_dict.values()), loc='center')
+    plt.subplots_adjust(wspace=0.3, hspace=0.35)
+    plt.savefig(f'{file_name}_arsenal_summary.png')
 
 
 def spray_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
@@ -125,17 +178,18 @@ def spray_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
         for distance, direction in zip(r_data['Distance'].values, r_data['Direction'].values):
             x_cords.append(distance * sin(radians(direction)))
             y_cords.append(distance * cos(radians(direction)))
-        if len(x_cords) > 0:
-            plt.scatter(x_cords, y_cords, color=hit_color[result], label=result)
+        if len(x_cords) == 0:
+            continue
+        plt.scatter(x_cords, y_cords, color=hit_color[result], label=result)
 
-    if chart_made:
-        plt.xlabel('Hit Location (ft)')
-        plt.ylabel('Hit Location (ft)')
-        plt.title(f'Spray Chart - {name}')
-        plt.legend()
-        plt.savefig(f'{file_name}_spray_chart.png')
+    if not chart_made:
+        return
 
-    plt.close()
+    plt.xlabel('Hit Location (ft)')
+    plt.ylabel('Hit Location (ft)')
+    plt.title(f'Spray Chart - {name}')
+    plt.legend()
+    plt.savefig(f'{file_name}_spray_chart.png')
 
 
 def create_charts(name: str, pitcher_data: pd.DataFrame) -> None:
@@ -157,10 +211,14 @@ def create_charts(name: str, pitcher_data: pd.DataFrame) -> None:
     file_name = f"{name.replace(', ', '_')}_{date}"
     full_path = os.path.join(path, file_name)
 
+    pitch_summaries(name, pitcher_data, full_path)
+    plt.close()
     horz_vert_break_chart(name, pitcher_data, full_path)
+    plt.close()
     pitch_calls_chart(name, pitcher_data, full_path)
-    box_charts(name, pitcher_data, full_path)
+    plt.close()
     spray_chart(name, pitcher_data, full_path)
+    plt.close()
 
 
 if __name__ == '__main__':
@@ -173,6 +231,7 @@ if __name__ == '__main__':
     SAVE_FILE = fd.askdirectory(mustexist=True, title="Select Save Folder") if len(CSV_FILES) > 0 else None
 
     if len(CSV_FILES) == 0 or len(SAVE_FILE) == 0:
+        print('CSV files and a save folder are required')
         quit(1)
 
     if os.name == 'nt':
