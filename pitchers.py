@@ -191,7 +191,7 @@ def spray_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
     plt.savefig(f'{file_name}_spray_chart.png')
 
 
-def create_charts(name: str, pitcher_data: pd.DataFrame, prog_bar: tqdm, num_pitchers: int) -> None:
+def create_charts(name: str, pitcher_data: pd.DataFrame, prog_bar: tqdm) -> None:
     # Get the date of when the pitcher pitched
     date = pitcher_data['Date'].values[0]
     if '-' in date:
@@ -264,6 +264,6 @@ if __name__ == '__main__':
     with tqdm(total=int(pitchers.ngroups) * 4, desc='Iterating through Trackman CSV Files') as bar:
         for name_and_date, pitcher in pitchers:
             pitcher_name = name_and_date[0].strip()
-            create_charts(pitcher_name, pitcher, bar, len(pitchers))
+            create_charts(pitcher_name, pitcher, bar)
 
     os.startfile(SAVE_FILE)
