@@ -154,7 +154,6 @@ def pitch_summaries(name: str, data: pd.DataFrame, file_name: str) -> None:
             ax.set_xticklabels([])  # Hide the x-ticks bar
             ax.set_ylabel(units[data_points[i]])
     except IndexError:
-        print(f'Error for {name} {data["Date"].values[0]}')
         return
 
     fig.suptitle(f'Pitch Arsenal Summary - {name}')
@@ -192,7 +191,7 @@ def spray_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
     plt.savefig(f'{file_name}_spray_chart.png')
 
 
-def create_charts(name: str, pitcher_data: pd.DataFrame) -> None:
+def create_charts(name: str, pitcher_data: pd.DataFrame, prog_bar: tqdm, num_pitchers: int) -> None:
     # Get the date of when the pitcher pitched
     date = pitcher_data['Date'].values[0]
     if '-' in date:
@@ -213,12 +212,16 @@ def create_charts(name: str, pitcher_data: pd.DataFrame) -> None:
 
     pitch_summaries(name, pitcher_data, full_path)
     plt.close()
+    prog_bar.update(1)
     horz_vert_break_chart(name, pitcher_data, full_path)
     plt.close()
+    prog_bar.update(1)
     pitch_calls_chart(name, pitcher_data, full_path)
     plt.close()
+    prog_bar.update(1)
     spray_chart(name, pitcher_data, full_path)
     plt.close()
+    prog_bar.update(1)
 
 
 if __name__ == '__main__':
@@ -237,12 +240,14 @@ if __name__ == '__main__':
     if os.name == 'nt':
         SAVE_FILE = SAVE_FILE.replace('/', '\\')
 
-    with tqdm(total=len(CSV_FILES), desc='Iterating through Trackman CSV Files') as bar:
+    df2 = pd.read_csv('year_long_data.csv')
+    total_df = pd.DataFrame()
+
+    with tqdm(total=len(CSV_FILES), desc='Compiling data...') as bar:
         for csv_file in CSV_FILES:
             df = pd.read_csv(csv_file)
 
             # Add to the annual data pool
-            df2 = pd.read_csv('year_long_data.csv')
             df2 = pd.concat([df, df2])
             df2.drop_duplicates(inplace=True)  # We can't have duplicate pitches
             df2.to_csv('year_long_data.csv', index=False)
@@ -251,10 +256,14 @@ if __name__ == '__main__':
                      'RelHeight', 'HorzBreak', 'InducedVertBreak', 'PitchCall', 'PlateLocHeight', 'PlateLocSide',
                      'PlayResult', 'Distance', 'Direction']]
 
-            for pitcher_name, pitcher in df.groupby(['Pitcher']):
-                pitcher_name = pitcher_name[0].strip()
-                create_charts(pitcher_name, pitcher)
-
+            total_df = pd.concat([df, total_df])
             bar.update(1)
+
+    pitchers = total_df.groupby(['Pitcher', 'Date'])
+
+    with tqdm(total=int(pitchers.ngroups) * 4, desc='Iterating through Trackman CSV Files') as bar:
+        for name_and_date, pitcher in pitchers:
+            pitcher_name = name_and_date[0].strip()
+            create_charts(pitcher_name, pitcher, bar, len(pitchers))
 
     os.startfile(SAVE_FILE)
