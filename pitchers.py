@@ -5,6 +5,9 @@ from math import sin, cos, radians, sqrt
 import os
 from tqdm import tqdm
 
+# Home team, formatted as tracked in Trackman
+HOME_TEAM = 'SHE_UNI'  # Shenandoah University
+
 # Colors and markers for plotting pitch types
 colors = {'Fastball': 'red', 'Curveball': 'blue', 'ChangeUp': 'green', 'Slider': 'yellow', 'Cutter': 'brown',
           'Sinker': 'purple', 'Splitter': 'silver', 'TwoSeamFastBall': 'navy', 'Knuckleball': 'black'}
@@ -42,7 +45,7 @@ def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None
 
     chart_made = False
     for pitch, pitch_data in pitches:
-        pitch = pitch[0]
+        pitch = pitch[0].strip()
         if pitch == 'Undefined':
             continue
         pitch_data.dropna(axis=0, subset=['HorzBreak', 'InducedVertBreak'], inplace=True)
@@ -67,7 +70,7 @@ def pitch_calls_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
     results = data.groupby(['PitchCall'])
     chart_made = False
     for call, pitch_data in results:
-        call = call[0]
+        call = call[0].strip()
         if call == 'Undefined':
             continue
         pitch_data.dropna(axis=0, subset=['HorzBreak', 'InducedVertBreak'], inplace=True)
@@ -100,10 +103,11 @@ def pitch_summaries(name: str, data: pd.DataFrame, file_name: str) -> None:
     pitch_names = []
 
     for pitch, group in pitches:
-        if 'Undefined' in pitch:
+        pitch = pitch[0].strip()
+        if pitch == 'Undefined':
             continue
         data_sets.append([])
-        pitch_names.append(pitch[0])
+        pitch_names.append(pitch)
         for dp in data_points:
             d = group[dp]
             d.dropna(axis=0, inplace=True)
@@ -168,7 +172,7 @@ def spray_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
 
     chart_made = False
     for result, r_data in data.groupby(['PlayResult']):
-        result = result[0]
+        result = result[0].strip()
         if result in ['Undefined', 'Strikeout']:
             continue
         r_data.dropna(axis=0, subset=['Distance', 'Direction'], inplace=True)
@@ -191,17 +195,12 @@ def spray_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
     plt.savefig(f'{file_name}_spray_chart.png')
 
 
-def create_charts(name: str, pitcher_data: pd.DataFrame, prog_bar: tqdm) -> None:
-    # Get the date of when the pitcher pitched
-    date = pitcher_data['Date'].values[0]
-    if '-' in date:
-        date = date.replace('-', '_')
-    if '/' in date:
-        date = date.replace('/', '_')
-
+def create_charts(name: str, date: str, pitcher_data: pd.DataFrame, save_file: str) -> None:
     # Create the new save folder to place all .png images in
-    path = os.path.join(SAVE_FILE, name.replace(', ', '_'), date) if HOME_TEAM == pitcher['PitcherTeam'].values[0] \
-        else os.path.join(SAVE_FILE, '_OPPONENTS', date, name.replace(', ', '_'))
+    path = os.path.join(save_file, name.replace(', ', '_'), date)
+    if pitcher_data['PitcherTeam'].values[0] != HOME_TEAM:
+        path = os.path.join(save_file, '_OPPONENTS', date, name.replace(', ', '_'))
+
     try:
         os.makedirs(path)
     except FileExistsError:
@@ -212,58 +211,55 @@ def create_charts(name: str, pitcher_data: pd.DataFrame, prog_bar: tqdm) -> None
 
     pitch_summaries(name, pitcher_data, full_path)
     plt.close()
-    prog_bar.update(1)
     horz_vert_break_chart(name, pitcher_data, full_path)
     plt.close()
-    prog_bar.update(1)
     pitch_calls_chart(name, pitcher_data, full_path)
     plt.close()
-    prog_bar.update(1)
     spray_chart(name, pitcher_data, full_path)
     plt.close()
-    prog_bar.update(1)
 
 
-if __name__ == '__main__':
-    # User's home team, formatted as tracked in Trackman
-    HOME_TEAM = 'SHE_UNI'
+def main():
+    # Select the Trackman files to visualize
+    csv_files = fd.askopenfilenames(filetypes=[('Trackman CSV Files', '*.csv')], title="Select Trackman Files")
+    # Select the folder the visualizations will be saved in (saved as .png images)
+    save_file = fd.askdirectory(mustexist=True, title="Select Save Folder") if len(csv_files) > 0 else None
 
-    # Select the Trackman files that the user wants to visualize
-    CSV_FILES = fd.askopenfilenames(filetypes=[('Trackman CSV Files', '*.csv')], title="Select Trackman Files")
-    # Get the folder the user wants to save the data visualizations in (saved as .png images)
-    SAVE_FILE = fd.askdirectory(mustexist=True, title="Select Save Folder") if len(CSV_FILES) > 0 else None
-
-    if len(CSV_FILES) == 0 or len(SAVE_FILE) == 0:
+    if len(csv_files) == 0 or len(save_file) == 0:
         print('CSV files and a save folder are required')
         quit(1)
 
     if os.name == 'nt':
-        SAVE_FILE = SAVE_FILE.replace('/', '\\')
+        save_file = save_file.replace('/', '\\')
 
     df2 = pd.read_csv('year_long_data.csv')
     total_df = pd.DataFrame()
 
-    with tqdm(total=len(CSV_FILES), desc='Compiling data...') as bar:
-        for csv_file in CSV_FILES:
-            df = pd.read_csv(csv_file)
+    for csv_file in tqdm(csv_files, desc='Compiling data...'):
+        df = pd.read_csv(csv_file)
 
-            # Add to the annual data pool
-            df2 = pd.concat([df, df2])
-            df2.drop_duplicates(inplace=True)  # We can't have duplicate pitches
-            df2.to_csv('year_long_data.csv', index=False)
+        # Add to the annual data pool
+        df2 = pd.concat([df, df2])
+        df2.drop_duplicates(inplace=True)  # We can't have duplicate pitches
+        df2.to_csv('year_long_data.csv', index=False)
 
-            df = df[['Date', 'Time', 'Pitcher', 'PitcherTeam', 'TaggedPitchType', 'RelSpeed', 'SpinRate', 'Extension',
-                     'RelHeight', 'HorzBreak', 'InducedVertBreak', 'PitchCall', 'PlateLocHeight', 'PlateLocSide',
-                     'PlayResult', 'Distance', 'Direction']]
+        df = df[['Date', 'Time', 'Pitcher', 'PitcherTeam', 'TaggedPitchType', 'RelSpeed', 'SpinRate', 'Extension',
+                 'RelHeight', 'HorzBreak', 'InducedVertBreak', 'PitchCall', 'PlateLocHeight', 'PlateLocSide',
+                 'PlayResult', 'Distance', 'Direction']]
 
-            total_df = pd.concat([df, total_df])
-            bar.update(1)
+        total_df = pd.concat([df, total_df])
 
     pitchers = total_df.groupby(['Pitcher', 'Date'])
+    for name_and_date, pitcher_data in tqdm(pitchers, desc='Generating visualizations...'):
+        name, date = name_and_date
+        if '-' in date:
+            date = str(date).replace('-', '_')
+        elif '/' in date:
+            date = str(date).replace('/', '_')
+        create_charts(name, date, pitcher_data, save_file)
 
-    with tqdm(total=int(pitchers.ngroups) * 4, desc='Iterating through Trackman CSV Files') as bar:
-        for name_and_date, pitcher in pitchers:
-            pitcher_name = name_and_date[0].strip()
-            create_charts(pitcher_name, pitcher, bar)
+    os.startfile(save_file)
 
-    os.startfile(SAVE_FILE)
+
+if __name__ == '__main__':
+    main()
