@@ -1,12 +1,14 @@
-import matplotlib.pyplot as plt
+import os
 import pandas as pd
+import matplotlib.pyplot as plt
 from tkinter import filedialog as fd
 from math import sin, cos, radians, sqrt
-import os
 from tqdm import tqdm
 
 # Home team, formatted as tracked in Trackman
 HOME_TEAM = 'SHE_UNI'  # Shenandoah University
+# Dots Per Inch: describes how detailed the charts are | Increased DPI -> Increased detail/resolution -> Larger images
+DPI = 200
 
 # Colors and markers for plotting pitch types
 colors = {'Fastball': 'red', 'Curveball': 'blue', 'ChangeUp': 'green', 'Slider': 'yellow', 'Cutter': 'brown',
@@ -18,6 +20,7 @@ xTikMarks = [-0.71, -0.24, 0.24, 0.71]
 yTikMarks = [1.65, 2.32, 2.99, 3.65]
 strike_zone_color = 'black'
 
+# Kevin Anderson Field at Bridgeforth Stadium field dimensions for spray charts
 fence_x = [0, -226.98, -130.8461, 0, 130.8461, 226.98, 0]
 fence_y = [0, 226.98, 346.0915, 395, 346.0915, 226.98, 0]
 fence_color = 'black'
@@ -35,6 +38,39 @@ result_color = {'StrikeCalled': 'red', 'StrikeSwinging': 'orange', 'FoulBall': '
 data_points = ['RelSpeed', 'SpinRate', 'Extension', 'RelHeight']
 translation = {'RelSpeed': 'Velocity', 'SpinRate': 'Spin Rate', 'Extension': 'Extension', 'RelHeight': 'Release Height'}
 units = {'RelSpeed': 'mph', 'SpinRate': 'rpm', 'Extension': 'ft', 'RelHeight': 'ft'}
+
+
+def get_select_data():
+    # Select the Trackman files to visualize
+    csv_files = fd.askopenfilenames(filetypes=[('Trackman CSV Files', '*.csv')], title="Select Trackman Files")
+    # Select the folder the visualizations will be saved in (saved as .png images)
+    save_file = fd.askdirectory(mustexist=True, title="Select Save Folder") if len(csv_files) > 0 else None
+
+    if len(csv_files) == 0 or len(save_file) == 0:
+        print('Both the *.csv files and a save folder are required')
+        quit(1)
+
+    # Change file path to Windows compatible separator if running on Windows
+    if os.name == 'nt':
+        save_file = save_file.replace('/', '\\')
+
+    annual_df = pd.read_csv('year_long_data.csv')
+    total_df = pd.DataFrame()
+
+    for csv_file in tqdm(csv_files, desc='Compiling data...'):
+        df = pd.read_csv(csv_file)
+        annual_df = pd.concat([annual_df, df])
+        df = df[['PitchNo', 'Date', 'Time', 'Pitcher', 'PitcherTeam', 'TaggedPitchType', 'RelSpeed', 'SpinRate',
+                 'Extension', 'RelHeight', 'HorzBreak', 'InducedVertBreak', 'PitchCall', 'PlateLocHeight',
+                 'PlateLocSide', 'PlayResult', 'Distance', 'Direction']]
+        df['Date'] = pd.to_datetime(df['Date'])
+        df['Date'] = df['Date'].dt.date
+        total_df = pd.concat([total_df, df])
+
+    annual_df.drop_duplicates(inplace=True)  # We can't have duplicate pitches
+    annual_df.to_csv('year_long_data.csv', index=False)
+
+    return save_file, total_df
 
 
 def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
@@ -62,12 +98,13 @@ def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None
     plt.ylabel('Vertical Break (in)')
     plt.title(f'Vertical and Horizontal Break by Pitch Type - {name}')
     plt.legend()
-    plt.savefig(fname=f"{file_name}_pitch_breaks.png")
+    plt.savefig(fname=f"{file_name}_pitch_breaks.png", dpi=DPI)
 
 
 def pitch_calls_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
     # Building the strike zone and pitch calls scatter plot
     results = data.groupby(['PitchCall'])
+    results = results[results['PitchCall'] != 'Undefined']
     chart_made = False
     for call, pitch_data in results:
         call = call[0].strip()
@@ -76,7 +113,7 @@ def pitch_calls_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
         pitch_data.dropna(axis=0, subset=['HorzBreak', 'InducedVertBreak'], inplace=True)
         chart_made = chart_made or len(pitch_data) > 0
         plt.scatter(pitch_data['PlateLocSide'], pitch_data['PlateLocHeight'], c=result_color[call], marker='o',
-                    label=call)
+                    label=call, s=5)
 
     if not chart_made:
         return
@@ -90,7 +127,8 @@ def pitch_calls_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
     plt.ylabel('Vertical Location (ft)')
     plt.title(f'Pitch Location - {name}')
     plt.legend()
-    plt.savefig(fname=f"{file_name}_strike_zone.png")
+    plt.show()
+    plt.savefig(fname=f"{file_name}_strike_zone.png", dpi=DPI)
 
 
 def pitch_summaries(name: str, data: pd.DataFrame, file_name: str) -> None:
@@ -116,14 +154,10 @@ def pitch_summaries(name: str, data: pd.DataFrame, file_name: str) -> None:
     if len(data_sets) == 0:
         return
 
-    # Create subplots vertically
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(9 + int(pitches.ngroups), 8))
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(7 + int(pitches.ngroups), 7))
     axes = axes.flatten()
 
-    # Width of each violin plot
     width = 0.2
-
-    # Keep track of unique legend artists
     legend_artists_dict = {}
 
     # Plot multiple violin plots in each subplot
@@ -161,29 +195,31 @@ def pitch_summaries(name: str, data: pd.DataFrame, file_name: str) -> None:
         return
 
     fig.suptitle(f'Pitch Arsenal Summary - {name}')
-    fig.legend(handles=list(legend_artists_dict.values()), loc='center')
-    plt.subplots_adjust(wspace=0.3, hspace=0.35)
-    plt.savefig(f'{file_name}_arsenal_summary.png')
+    fig.legend(handles=list(legend_artists_dict.values()), loc='right')
+    plt.subplots_adjust(wspace=0.2, hspace=0.2)
+    plt.savefig(f'{file_name}_arsenal_summary.png', dpi=DPI)
 
 
 def spray_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
     plt.plot(fence_x, fence_y, color=fence_color)
     plt.plot(base_x, base_y, color=base_color, marker='s')
 
+    results = data.groupby(['PlayResult'])
+
     chart_made = False
-    for result, r_data in data.groupby(['PlayResult']):
+    for result, r_data in results:
         result = result[0].strip()
-        if result in ['Undefined', 'Strikeout']:
+        if result == 'Undefined':
             continue
         r_data.dropna(axis=0, subset=['Distance', 'Direction'], inplace=True)
-        chart_made = chart_made or len(r_data) > 0
+        if len(r_data) == 0:
+            continue
         x_cords, y_cords = [], []
         for distance, direction in zip(r_data['Distance'].values, r_data['Direction'].values):
             x_cords.append(distance * sin(radians(direction)))
             y_cords.append(distance * cos(radians(direction)))
-        if len(x_cords) == 0:
-            continue
         plt.scatter(x_cords, y_cords, color=hit_color[result], label=result)
+        chart_made = True
 
     if not chart_made:
         return
@@ -192,7 +228,7 @@ def spray_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
     plt.ylabel('Hit Location (ft)')
     plt.title(f'Spray Chart - {name}')
     plt.legend()
-    plt.savefig(f'{file_name}_spray_chart.png')
+    plt.savefig(f'{file_name}_spray_chart.png', dpi=DPI)
 
 
 def create_charts(name: str, date: str, pitcher_data: pd.DataFrame, save_file: str) -> None:
@@ -220,42 +256,13 @@ def create_charts(name: str, date: str, pitcher_data: pd.DataFrame, save_file: s
 
 
 def main():
-    # Select the Trackman files to visualize
-    csv_files = fd.askopenfilenames(filetypes=[('Trackman CSV Files', '*.csv')], title="Select Trackman Files")
-    # Select the folder the visualizations will be saved in (saved as .png images)
-    save_file = fd.askdirectory(mustexist=True, title="Select Save Folder") if len(csv_files) > 0 else None
+    save_file, df = get_select_data()
 
-    if len(csv_files) == 0 or len(save_file) == 0:
-        print('CSV files and a save folder are required')
-        quit(1)
-
-    if os.name == 'nt':
-        save_file = save_file.replace('/', '\\')
-
-    df2 = pd.read_csv('year_long_data.csv')
-    total_df = pd.DataFrame()
-
-    for csv_file in tqdm(csv_files, desc='Compiling data...'):
-        df = pd.read_csv(csv_file)
-
-        # Add to the annual data pool
-        df2 = pd.concat([df, df2])
-        df2.drop_duplicates(inplace=True)  # We can't have duplicate pitches
-        df2.to_csv('year_long_data.csv', index=False)
-
-        df = df[['Date', 'Time', 'Pitcher', 'PitcherTeam', 'TaggedPitchType', 'RelSpeed', 'SpinRate', 'Extension',
-                 'RelHeight', 'HorzBreak', 'InducedVertBreak', 'PitchCall', 'PlateLocHeight', 'PlateLocSide',
-                 'PlayResult', 'Distance', 'Direction']]
-
-        total_df = pd.concat([df, total_df])
-
-    pitchers = total_df.groupby(['Pitcher', 'Date'])
+    pitchers = df.groupby(['Pitcher', 'Date'])
     for name_and_date, pitcher_data in tqdm(pitchers, desc='Generating visualizations...'):
         name, date = name_and_date
-        if '-' in date:
-            date = str(date).replace('-', '_')
-        elif '/' in date:
-            date = str(date).replace('/', '_')
+        name = str(name).strip()
+        date = str(date).replace('-', '_').strip()
         create_charts(name, date, pitcher_data, save_file)
 
     os.startfile(save_file)
