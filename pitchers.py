@@ -73,8 +73,8 @@ def get_select_data():
     return save_file, total_df
 
 
+# Building the Horizontal vs Vertical Break of each pitch scatter plot
 def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
-    # Building the Horizontal vs Vertical Break of each pitch scatter plot
     pitches = data.groupby(['TaggedPitchType'])
     if len(pitches) == 0:
         pitches = data.groupby(['AutoPitchType'])
@@ -85,9 +85,11 @@ def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None
         if pitch == 'Undefined':
             continue
         pitch_data.dropna(axis=0, subset=['HorzBreak', 'InducedVertBreak'], inplace=True)
-        chart_made = chart_made or len(pitch_data) > 0
+        if len(pitch_data) == 0:
+            continue
         plt.scatter(pitch_data['HorzBreak'], pitch_data['InducedVertBreak'], c=colors[pitch], marker=markers[pitch],
                     label=pitch)
+        chart_made = True
 
     if not chart_made:
         return
@@ -101,19 +103,21 @@ def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None
     plt.savefig(fname=f"{file_name}_pitch_breaks.png", dpi=DPI)
 
 
+# Building the strike zone and pitch calls scatter plot
 def pitch_calls_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
-    # Building the strike zone and pitch calls scatter plot
     results = data.groupby(['PitchCall'])
-    results = results[results['PitchCall'] != 'Undefined']
+
     chart_made = False
     for call, pitch_data in results:
         call = call[0].strip()
         if call == 'Undefined':
             continue
         pitch_data.dropna(axis=0, subset=['HorzBreak', 'InducedVertBreak'], inplace=True)
-        chart_made = chart_made or len(pitch_data) > 0
+        if len(pitch_data) == 0:
+            continue
         plt.scatter(pitch_data['PlateLocSide'], pitch_data['PlateLocHeight'], c=result_color[call], marker='o',
                     label=call, s=5)
+        chart_made = True
 
     if not chart_made:
         return
@@ -127,7 +131,6 @@ def pitch_calls_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
     plt.ylabel('Vertical Location (ft)')
     plt.title(f'Pitch Location - {name}')
     plt.legend()
-    plt.show()
     plt.savefig(fname=f"{file_name}_strike_zone.png", dpi=DPI)
 
 
@@ -170,10 +173,9 @@ def pitch_summaries(name: str, data: pd.DataFrame, file_name: str) -> None:
                 # Calculate the position for the current violin
                 pos = i + j * width - (n_datasets_per_plot - 1) * width / 2
 
-                # Plot violin plot
                 parts = ax.violinplot(dataset, positions=[pos], widths=width, showmeans=True)
 
-                # Set properties for all lines
+                # Change all line colors to black
                 for pc in parts['bodies']:
                     pc.set_facecolor(color)
                     pc.set_edgecolor('black')
