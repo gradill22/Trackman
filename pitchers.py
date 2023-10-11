@@ -53,7 +53,8 @@ def get_select_data():
                  'Extension', 'RelHeight', 'RelSide', 'VertRelAngle', 'HorzRelAngle', 'VertBreak', 'HorzBreak',
                  'InducedVertBreak', 'VertApprAngle', 'HorzApprAngle', 'PitchCall', 'PlateLocHeight', 'PlateLocSide',
                  'PlayResult', 'Distance', 'Direction']]
-        df['Date'] = pd.to_datetime(df['Date']).dt.date
+        df['Date'] = pd.to_datetime(df['Date'])
+        df['Date'] = df['Date'].dt.date
         total_df = pd.concat([df, total_df])
 
     annual_df.drop_duplicates(inplace=True)  # We can't have duplicate pitches
@@ -86,10 +87,6 @@ def plot_strike_zone(color='black'):
 
 # Building the Horizontal vs Vertical Break of each pitch scatter plot
 def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
-    data = data[data['TaggedPitchType'] != 'Undefined']
-    if len(data) == 0:
-        return
-
     sns.scatterplot(data, x='HorzBreak', y='InducedVertBreak', hue='TaggedPitchType')
     plt.axvline(x=0, color='black', linestyle=':')
     plt.axhline(y=0, color='black', linestyle=':')
@@ -102,10 +99,6 @@ def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None
 
 # Building the strike zone and pitch calls scatter plot
 def pitch_calls_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
-    data = data[data['PitchCall'] != 'Undefined']
-    if len(data) == 0:
-        return
-
     sns.scatterplot(data, x='PlateLocSide', y='PlateLocHeight', hue='PitchCall')
     plot_strike_zone()
     plt.xlabel('Horizontal Location (ft)')
