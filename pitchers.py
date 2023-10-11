@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 from tkinter import filedialog as fd
 from math import sin, cos, radians, sqrt
@@ -11,23 +12,11 @@ HOME_TEAM = 'SHE_UNI'  # Shenandoah University
 DPI = 200
 
 # Colors and markers for plotting pitch types
-colors = {'Fastball': 'red', 'Curveball': 'blue', 'ChangeUp': 'green', 'Slider': 'yellow', 'Cutter': 'brown',
-          'Sinker': 'purple', 'Splitter': 'silver', 'TwoSeamFastBall': 'navy', 'Knuckleball': 'black'}
-markers = {'Fastball': 'o', 'Curveball': 'v', 'ChangeUp': 'd', 'Cutter': 'x', 'Slider': 's', 'Sinker': '1',
-           'Splitter': '*', 'TwoSeamFastBall': '>', 'Knuckleball': '8'}
-
-xTikMarks = [-0.71, -0.24, 0.24, 0.71]
-yTikMarks = [1.65, 2.32, 2.99, 3.65]
-strike_zone_color = 'black'
-
-# Kevin Anderson Field at Bridgeforth Stadium field dimensions for spray charts
-fence_x = [0, -226.98, -130.8461, 0, 130.8461, 226.98, 0]
-fence_y = [0, 226.98, 346.0915, 395, 346.0915, 226.98, 0]
-fence_color = 'black'
-
-base_x = [0, -90 / sqrt(2), 0, 90 / sqrt(2), 0]
-base_y = [0, 90 / sqrt(2), 90 * sqrt(2), 90 / sqrt(2), 0]
-base_color = 'black'
+colors = {'Fastball': 'red', 'Curveball': 'blue', 'ChangeUp': 'green', 'Changeup': 'green', 'Slider': 'yellow',
+          'Cutter': 'brown', 'Sinker': 'purple', 'Splitter': 'silver', 'TwoSeamFastBall': 'navy',
+          'Knuckleball': 'black'}
+markers = {'Fastball': 'o', 'Curveball': 'v', 'ChangeUp': 'd', 'Changeup': 'd', 'Cutter': 'x', 'Slider': 's',
+           'Sinker': '1', 'Splitter': '*', 'TwoSeamFastBall': '>', 'Knuckleball': '8'}
 
 hit_color = {'Out': 'red', 'FieldersChoice': 'navy', 'Single': 'orange', 'Sacrifice': 'blue', 'Double': 'yellow',
              'Triple': 'purple', 'HomeRun': 'green', 'Error': 'cyan'}
@@ -54,46 +43,54 @@ def get_select_data():
     if os.name == 'nt':
         save_file = save_file.replace('/', '\\')
 
-    annual_df = pd.read_csv('year_long_data.csv')
+    annual_df = pd.read_csv('all_data.csv')
     total_df = pd.DataFrame()
 
-    for csv_file in tqdm(csv_files, desc='Compiling data...'):
+    for csv_file in tqdm(csv_files, desc='Compiling data'):
         df = pd.read_csv(csv_file)
         annual_df = pd.concat([annual_df, df])
         df = df[['PitchNo', 'Date', 'Time', 'Pitcher', 'PitcherTeam', 'TaggedPitchType', 'RelSpeed', 'SpinRate',
-                 'Extension', 'RelHeight', 'HorzBreak', 'InducedVertBreak', 'PitchCall', 'PlateLocHeight',
-                 'PlateLocSide', 'PlayResult', 'Distance', 'Direction']]
-        df['Date'] = pd.to_datetime(df['Date'])
-        df['Date'] = df['Date'].dt.date
-        total_df = pd.concat([total_df, df])
+                 'Extension', 'RelHeight', 'RelSide', 'VertRelAngle', 'HorzRelAngle', 'VertBreak', 'HorzBreak',
+                 'InducedVertBreak', 'VertApprAngle', 'HorzApprAngle', 'PitchCall', 'PlateLocHeight', 'PlateLocSide',
+                 'PlayResult', 'Distance', 'Direction']]
+        df['Date'] = pd.to_datetime(df['Date']).dt.date
+        total_df = pd.concat([df, total_df])
 
     annual_df.drop_duplicates(inplace=True)  # We can't have duplicate pitches
-    annual_df.to_csv('year_long_data.csv', index=False)
+    annual_df.to_csv('all_data.csv', index=False)
 
     return save_file, total_df
 
 
+def plot_field(fence_color='black', base_color='black'):
+    # Kevin Anderson Field at Bridgeforth Stadium field dimensions
+    fence_x = [0, -226.98, -130.8461, 0, 130.8461, 226.98, 0]
+    fence_y = [0, 226.98, 346.0915, 395, 346.0915, 226.98, 0]
+
+    base_x = [0, -90 / sqrt(2), 0, 90 / sqrt(2), 0]
+    base_y = [0, 90 / sqrt(2), 90 * sqrt(2), 90 / sqrt(2), 0]
+
+    plt.plot(fence_x, fence_y, color=fence_color)
+    plt.plot(base_x, base_y, color=base_color, marker='s')
+
+
+def plot_strike_zone(color='black'):
+    x_marks = [-0.71, -0.24, 0.24, 0.71]
+    y_marks = [1.65, 2.32, 2.99, 3.65]
+
+    for x in x_marks:
+        plt.plot([x, x], [y_marks[0], y_marks[-1]], c=color)
+    for y in y_marks:
+        plt.plot([x_marks[0], x_marks[-1]], [y, y], c=color)
+
+
 # Building the Horizontal vs Vertical Break of each pitch scatter plot
 def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
-    pitches = data.groupby(['TaggedPitchType'])
-    if len(pitches) == 0:
-        pitches = data.groupby(['AutoPitchType'])
-
-    chart_made = False
-    for pitch, pitch_data in pitches:
-        pitch = pitch[0].strip()
-        if pitch == 'Undefined':
-            continue
-        pitch_data.dropna(axis=0, subset=['HorzBreak', 'InducedVertBreak'], inplace=True)
-        if len(pitch_data) == 0:
-            continue
-        plt.scatter(pitch_data['HorzBreak'], pitch_data['InducedVertBreak'], c=colors[pitch], marker=markers[pitch],
-                    label=pitch)
-        chart_made = True
-
-    if not chart_made:
+    data = data[data['TaggedPitchType'] != 'Undefined']
+    if len(data) == 0:
         return
 
+    sns.scatterplot(data, x='HorzBreak', y='InducedVertBreak', hue='TaggedPitchType')
     plt.axvline(x=0, color='black', linestyle=':')
     plt.axhline(y=0, color='black', linestyle=':')
     plt.xlabel('Horizontal Break (in)')
@@ -105,28 +102,12 @@ def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None
 
 # Building the strike zone and pitch calls scatter plot
 def pitch_calls_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
-    results = data.groupby(['PitchCall'])
-
-    chart_made = False
-    for call, pitch_data in results:
-        call = call[0].strip()
-        if call == 'Undefined':
-            continue
-        pitch_data.dropna(axis=0, subset=['HorzBreak', 'InducedVertBreak'], inplace=True)
-        if len(pitch_data) == 0:
-            continue
-        plt.scatter(pitch_data['PlateLocSide'], pitch_data['PlateLocHeight'], c=result_color[call], marker='o',
-                    label=call, s=5)
-        chart_made = True
-
-    if not chart_made:
+    data = data[data['PitchCall'] != 'Undefined']
+    if len(data) == 0:
         return
 
-    for x in xTikMarks:
-        plt.plot([x, x], [yTikMarks[0], yTikMarks[-1]], color=strike_zone_color)
-    for y in yTikMarks:
-        plt.plot([xTikMarks[0], xTikMarks[-1]], [y, y], color=strike_zone_color)
-
+    sns.scatterplot(data, x='PlateLocSide', y='PlateLocHeight', hue='PitchCall')
+    plot_strike_zone()
     plt.xlabel('Horizontal Location (ft)')
     plt.ylabel('Vertical Location (ft)')
     plt.title(f'Pitch Location - {name}')
@@ -203,9 +184,6 @@ def pitch_summaries(name: str, data: pd.DataFrame, file_name: str) -> None:
 
 
 def spray_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
-    plt.plot(fence_x, fence_y, color=fence_color)
-    plt.plot(base_x, base_y, color=base_color, marker='s')
-
     results = data.groupby(['PlayResult'])
 
     chart_made = False
@@ -226,6 +204,7 @@ def spray_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
     if not chart_made:
         return
 
+    plot_field()
     plt.xlabel('Hit Location (ft)')
     plt.ylabel('Hit Location (ft)')
     plt.title(f'Spray Chart - {name}')
@@ -261,7 +240,7 @@ def main():
     save_file, df = get_select_data()
 
     pitchers = df.groupby(['Pitcher', 'Date'])
-    for name_and_date, pitcher_data in tqdm(pitchers, desc='Generating visualizations...'):
+    for name_and_date, pitcher_data in tqdm(pitchers, desc='Generating visualizations'):
         name, date = name_and_date
         name = str(name).strip()
         date = str(date).replace('-', '_').strip()
