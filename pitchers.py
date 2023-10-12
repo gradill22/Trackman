@@ -1,28 +1,16 @@
 import os
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from tkinter import filedialog as fd
-from math import sin, cos, radians, sqrt
+from math import sqrt
 from tqdm import tqdm
 
 # Home team, formatted as tracked in Trackman
 HOME_TEAM = 'SHE_UNI'  # Shenandoah University
 # Dots Per Inch: describes how detailed the charts are | Increased DPI -> Increased detail/resolution -> Larger images
 DPI = 200
-
-# Colors and markers for plotting pitch types
-colors = {'Fastball': 'red', 'Curveball': 'blue', 'ChangeUp': 'green', 'Changeup': 'green', 'Slider': 'yellow',
-          'Cutter': 'brown', 'Sinker': 'purple', 'Splitter': 'silver', 'TwoSeamFastBall': 'navy',
-          'Knuckleball': 'black'}
-markers = {'Fastball': 'o', 'Curveball': 'v', 'ChangeUp': 'd', 'Changeup': 'd', 'Cutter': 'x', 'Slider': 's',
-           'Sinker': '1', 'Splitter': '*', 'TwoSeamFastBall': '>', 'Knuckleball': '8'}
-
-hit_color = {'Out': 'red', 'FieldersChoice': 'navy', 'Single': 'orange', 'Sacrifice': 'blue', 'Double': 'yellow',
-             'Triple': 'purple', 'HomeRun': 'green', 'Error': 'cyan'}
-
-result_color = {'StrikeCalled': 'red', 'StrikeSwinging': 'orange', 'FoulBall': 'yellow', 'InPlay': 'green',
-                'BallCalled': 'blue', 'BallinDirt': 'brown', 'HitByPitch': 'purple'}
 
 data_points = ['RelSpeed', 'SpinRate', 'Extension', 'RelHeight']
 translation = {'RelSpeed': 'Velocity', 'SpinRate': 'Spin Rate', 'Extension': 'Extension', 'RelHeight': 'Release Height'}
@@ -43,7 +31,10 @@ def get_select_data():
     if os.name == 'nt':
         save_file = save_file.replace('/', '\\')
 
-    annual_df = pd.read_csv('all_data.csv')
+    try:
+        annual_df = pd.read_csv('all_data.csv')
+    except FileNotFoundError:
+        annual_df = pd.DataFrame()
     total_df = pd.DataFrame()
 
     for csv_file in tqdm(csv_files, desc='Compiling data'):
@@ -87,7 +78,13 @@ def plot_strike_zone(color='black'):
 
 # Building the Horizontal vs Vertical Break of each pitch scatter plot
 def horz_vert_break_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
-    sns.scatterplot(data, x='HorzBreak', y='InducedVertBreak', hue='TaggedPitchType')
+    hue = 'TaggedPitchType'
+    pitches = data[data[hue] != 'Undefined']
+    if len(pitches) == 0:
+        hue = 'AutoPitchType'
+        pitches = data[data[hue] != 'Undefined']
+
+    sns.scatterplot(pitches, x='HorzBreak', y='InducedVertBreak', hue=hue)
     plt.axvline(x=0, color='black', linestyle=':')
     plt.axhline(y=0, color='black', linestyle=':')
     plt.xlabel('Horizontal Break (in)')
@@ -109,94 +106,40 @@ def pitch_calls_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
 
 
 def pitch_summaries(name: str, data: pd.DataFrame, file_name: str) -> None:
-    pitches = data.groupby(['TaggedPitchType'])
+    hue = 'TaggedPitchType'
+    pitches = data[data[hue] != 'Undefined']
     if len(pitches) == 0:
-        pitches = data.groupby(['AutoPitchType'])
+        hue = 'AutoPitchType'
+        pitches = data[data[hue] != 'Undefined']
 
-    n_datasets_per_plot = int(pitches.ngroups)
-    data_sets = []
-    pitch_names = []
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(10, 7))
 
-    for pitch, group in pitches:
-        pitch = pitch[0].strip()
-        if pitch == 'Undefined':
-            continue
-        data_sets.append([])
-        pitch_names.append(pitch)
-        for dp in data_points:
-            d = group[dp]
-            d.dropna(axis=0, inplace=True)
-            data_sets[-1].append(d)
-
-    if len(data_sets) == 0:
-        return
-
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(7 + int(pitches.ngroups), 7))
-    axes = axes.flatten()
-
-    width = 0.2
-    legend_artists_dict = {}
-
-    # Plot multiple violin plots in each subplot
-    try:
-        for i, ax in enumerate(axes):
-            for j in range(n_datasets_per_plot):
-                dataset = data_sets[j][i]
-                color = colors[pitch_names[j]]
-
-                # Calculate the position for the current violin
-                pos = i + j * width - (n_datasets_per_plot - 1) * width / 2
-
-                parts = ax.violinplot(dataset, positions=[pos], widths=width, showmeans=True)
-
-                # Change all line colors to black
-                for pc in parts['bodies']:
-                    pc.set_facecolor(color)
-                    pc.set_edgecolor('black')
-                    pc.set_alpha(0.6)
-                for part_name in ('cbars', 'cmaxes', 'cmins', 'cmeans'):
-                    vp = parts[part_name]
-                    vp.set_edgecolor('black')
-
-                # Create an artist for the legend
-                legend_key = (color, pitch_names[j])
-                if legend_key not in legend_artists_dict:
-                    legend_artists_dict[legend_key] = plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=color,
-                                                                 markersize=10, label=pitch_names[j])
-
-            ax.set_title(translation[data_points[i]])
-            ax.set_xticklabels([])  # Hide the x-ticks bar
-            ax.set_ylabel(units[data_points[i]])
-    except IndexError:
-        return
+    index = 0
+    for axs in axes:
+        for ax in axs:
+            dp = data_points[index]
+            ax = sns.violinplot(data=pitches, y=dp, hue=hue, ax=ax)
+            ax.set_ylabel(units[dp])
+            ax.set_title(translation[dp])
+            ax.legend()
+            ax.set_xticklabels([])
+            index += 1
 
     fig.suptitle(f'Pitch Arsenal Summary - {name}')
-    fig.legend(handles=list(legend_artists_dict.values()), loc='right')
     plt.subplots_adjust(wspace=0.2, hspace=0.2)
     plt.savefig(f'{file_name}_arsenal_summary.png', dpi=DPI)
 
 
 def spray_chart(name: str, data: pd.DataFrame, file_name: str) -> None:
-    results = data.groupby(['PlayResult'])
-
-    chart_made = False
-    for result, r_data in results:
-        result = result[0].strip()
-        if result == 'Undefined':
-            continue
-        r_data.dropna(axis=0, subset=['Distance', 'Direction'], inplace=True)
-        if len(r_data) == 0:
-            continue
-        x_cords, y_cords = [], []
-        for distance, direction in zip(r_data['Distance'].values, r_data['Direction'].values):
-            x_cords.append(distance * sin(radians(direction)))
-            y_cords.append(distance * cos(radians(direction)))
-        plt.scatter(x_cords, y_cords, color=hit_color[result], label=result)
-        chart_made = True
-
-    if not chart_made:
+    results = data[data['PlayResult'] != 'Undefined']
+    if len(results) == 0:
         return
 
+    results = results.dropna(axis=0)
+    results['Distance*sin(Direction)'] = results['Distance'] * np.sin(np.radians(results['Direction']))
+    results['Distance*cos(Direction)'] = results['Distance'] * np.cos(np.radians(results['Direction']))
+
+    sns.scatterplot(data=results, x='Distance*sin(Direction)', y='Distance*cos(Direction)', hue='PlayResult')
     plot_field()
     plt.xlabel('Hit Location (ft)')
     plt.ylabel('Hit Location (ft)')
