@@ -31,25 +31,13 @@ def get_select_data():
     if os.name == 'nt':
         save_file = save_file.replace('/', '\\')
 
-    try:
-        annual_df = pd.read_csv('all_data.csv')
-    except FileNotFoundError:
-        annual_df = pd.DataFrame()
     total_df = pd.DataFrame()
 
     for csv_file in tqdm(csv_files, desc='Compiling data'):
         df = pd.read_csv(csv_file)
-        annual_df = pd.concat([annual_df, df])
-        df = df[['PitchNo', 'Date', 'Time', 'Pitcher', 'PitcherTeam', 'TaggedPitchType', 'RelSpeed', 'SpinRate',
-                 'Extension', 'RelHeight', 'RelSide', 'VertRelAngle', 'HorzRelAngle', 'VertBreak', 'HorzBreak',
-                 'InducedVertBreak', 'VertApprAngle', 'HorzApprAngle', 'PitchCall', 'PlateLocHeight', 'PlateLocSide',
-                 'PlayResult', 'Distance', 'Direction']]
         df['Date'] = pd.to_datetime(df['Date'])
         df['Date'] = df['Date'].dt.date
         total_df = pd.concat([df, total_df])
-
-    annual_df.drop_duplicates(inplace=True)  # We can't have duplicate pitches
-    annual_df.to_csv('all_data.csv', index=False)
 
     return save_file, total_df
 
@@ -76,11 +64,9 @@ def plot_strike_zone(color='black'):
 
 
 def pitches_and_hue(data: pd.DataFrame) -> (pd.DataFrame, str):
-    hue = 'TaggedPitchType'
+    hue = 'TaggedPitchType' if data[data['TaggedPitchType'] != 'Undefined'].shape[0] > 0 else 'AutoPitchType'
     pitches = data[data[hue] != 'Undefined']
-    if len(pitches) == 0 and 'AutoPitchType' in data.columns:
-        hue = 'AutoPitchType'
-        pitches = data[data[hue] != 'Undefined']
+
     return pitches, hue
 
 
