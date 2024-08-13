@@ -76,7 +76,7 @@ The extension chart shows the fastball and changeup being thrown from a consiste
 
 The release height chart shows the fastball and slider were thrown from mostly consistent heights while the changeup was significantly lower. The disparity between the changeup's release height and the rest of the pitches' release heights could make it easy for hitters to pick up. The fastball and changeup both have multiple bubbles while the slider has a mostly consistent release height.
 
-### Conclusion
+#### Conclusion
 
 According to this visualization, the pitcher needs to work more on a consistent arm path with all three of his pitches. He has good speed variance and mostly good spin on each pitch. The pitcher does not tunnel his pitches well, especially with the changeup. Once a more consistent arm path is found across his arsenal, this pitcher will be much more effective.
 
@@ -109,7 +109,7 @@ The slider very consistently breaks between 20 and 30 inches horizontally. It lo
 
 The changeup consistently moves horizontally by about 20 inches or so. It has a consistent vertical movement of about -3 inches with the exception of an outlier. Overall, the movement on the changeup is consistent both horizontally and vertically.
 
-### Conclusion
+#### Conclusion
 
 The fastball and slider need to have more consistent movement. The fastball needs more consistent vertical and horizontal movement while the slider needs to have more consistent vertical movement. The changeup is mostly consistent. To be a more effective pitcher, find a more consistent finish with each pitch at release.
 
@@ -130,7 +130,7 @@ This is a great chart to show offensive tendencies against a pitcher. Look for w
 
 Generally speaking, the balls that were put in play were pretty spread out. There was a strong tendency to hit balls in the outfield and drive it up the middle of the field. All balls beyond the infield were hit within the gaps.
 
-### Conclusion
+#### Conclusion
 
 Compared to the two groundballs that were put in play, most contact was barreled up. This is a good indication that the pitcher has a tendency to miss his spots over the plate. This pitcher will be much more effective when he begins to consistently hit more of his spots and not leave any balls over the plate.
 
@@ -151,6 +151,6 @@ Where are the pitches hitters putting in play? Where are the pitches hitters are
 
 There were a lot of pitches that were missed outside the zone low and away. In fact, it looks like that’s where most of the pitches were. There was hardly any foul ball contact or pitches swung at. Most of the pitches were called or put in play.
 
-### Conclusion
+#### Conclusion
 
 The umpire was calling a lot of pitches low and off the plate. This is a good reason for missing so much out there as well. A couple of those strike calls were nearly a foot off the plate. It makes sense to throw pitches there a whole lot. Most of the balls put in play were low in the zone with only a few up in the zone. This could be because most of the pitches were low in the zone anyway. Pitches fouled away were very scattered throughout the strike zone, so it’s hard to tell if they were well-executed pitches or not. Overall, the pitcher did a good job of pitching low in the zone and taking advantage of the umpire’s low and away strike zone. To improve, he needs to be more competitive with his pitching and not throw balls over two feet off the plate.
