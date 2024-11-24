@@ -1,6 +1,6 @@
 from dash import html, register_page, dcc
 
-register_page(__name__, path="/login", title="Login", order=1)
+register_page(__name__, path="/login", title="Login", order=2)
 
 layout = html.Div([
     html.H2("Login Page"),

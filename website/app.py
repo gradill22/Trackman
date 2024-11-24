@@ -15,7 +15,4 @@ app.layout = html.Div([
 
 
 if __name__ == "__main__":
-    for k, v in page_registry.items():
-        print(f"{k} => {v}")
-    print("Page container:", page_container, sep="\n")
     app.run_server(debug=True)

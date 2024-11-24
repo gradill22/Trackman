@@ -9,7 +9,7 @@ import dash_bootstrap_components as dbc
 from dash import html, dcc, Input, Output, ALL, callback, callback_context as ctx, register_page
 
 
-register_page(__name__, path="/data_lab", title="Data Laboratory", order=2)
+register_page(__name__, path="/data_lab", title="Data Laboratory", order=3)
 
 MAIN_DATA: pd.DataFrame = pd.read_csv("data/total_data.csv", index_col="index")
 
